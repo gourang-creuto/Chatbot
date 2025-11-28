@@ -1,21 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-// import { ChatOpenAI } from '@langchain/openai';
+import { ChatOpenAI } from '@langchain/openai';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { PromptTemplate } from '@langchain/core/prompts';
 
 @Injectable()
 export class ChatbotService {
-  // private model: ChatOpenAI;
-  private model: ChatGoogleGenerativeAI;
-  private prompt: PromptTemplate;
+  private openaiModel: ChatOpenAI;
+  private geminiModel: ChatGoogleGenerativeAI;
+  private personalDataPrompt: PromptTemplate;
+  private greetingPrompt: PromptTemplate;
+  private firstLetter: string;
 
   constructor(private configService: ConfigService) {
-    // this.model = new ChatOpenAI({
-    //   openAIApiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    //   modelName: 'gpt-4o-mini',
-    // });
-    this.model = new ChatGoogleGenerativeAI({
+    this.openaiModel = new ChatOpenAI({
+      openAIApiKey: this.configService.get<string>('OPENAI_API_KEY'),
+      modelName: 'gpt-4o-mini',
+    });
+    this.geminiModel = new ChatGoogleGenerativeAI({
       apiKey: this.configService.get<string>('GOOGLE_API_KEY'),
       model: 'gemini-2.5-flash',
     });
@@ -44,45 +46,51 @@ Implemented customer maintenance strategies.
 Recent computer science graduate with a position for developing scalable web applications and working
 across the full stack. I am looking for to join in a reputed organization along with a position to constantly
 learn, contribute and grow along with the organization.
-GOURANGA CHARAN MISHRA
+name: GOURANGA CHARAN MISHRA
 Phone : +91-7438888672
 Mail: gourangcharanmishra2001@gmail.com
 LinkedIn: https://www.linkedin.com/in/gc-mishra
-
-TECHNICAL SKILLS
-
-PROJECTS
-
-EDUCATION
-
-ADDITIONAL INFORMATION
-HTML
-CSS
-Javascript
-
-React.js
-Node.js
-Express.js
-
-MongoDB
-PostgreSQL
-Redux Toolkit
-
 Date of Birth: 31-12-2001
     `;
 
-    this.prompt = PromptTemplate.fromTemplate(
-      `Here is the personal data about Gouranga Charan Mishra:\n${personalData}\n\nYou are a chatbot providing information about Gouranga Charan Mishra. Answer questions in second person accurately whatever they asks. The user said: "{message}". The user name is {name}. If it's a greeting like nicely respond with "appropriate word {name}". Otherwise, answer based on the data.`
+    this.personalDataPrompt = PromptTemplate.fromTemplate(
+      `Here is the personal data about Gouranga Charan Mishra:${personalData}You are a chatbot providing information about Gouranga Charan Mishra. Answer questions in second person accurately whatever they asks. The user said: "{message}". Answer based on the data.`,
+    );
+
+    this.greetingPrompt = PromptTemplate.fromTemplate(
+      `Respond with a nice greeting using the name from the personal data: ${personalData}`,
     );
   }
 
-  async getResponse(message: string, name: string): Promise<string> {
+  private isGreeting(message: string): boolean {
+    const greetings = [
+      'hello',
+      'hi',
+      'hey',
+      'good morning',
+      'good afternoon',
+      'good evening',
+      'greetings',
+    ];
+    const lowerMessage = message.toLowerCase().trim();
+    return greetings.some((greeting) => lowerMessage.includes(greeting));
+  }
+
+  async getResponse(message: string): Promise<string> {
     try {
-      const formattedPrompt = await this.prompt.format({ message, name });
-      const response = await this.model.invoke(formattedPrompt);
-      return (response.content as string).trim();
+      if (this.isGreeting(message)) {
+        const formattedPrompt = await this.greetingPrompt.format({});
+        const response = await this.geminiModel.invoke(formattedPrompt);
+        return (response.content as string).trim();
+      } else {
+        const formattedPrompt = await this.personalDataPrompt.format({
+          message,
+        });
+        const response = await this.openaiModel.invoke(formattedPrompt);
+        return (response.content as string).trim();
+      }
     } catch (error) {
-      console.error('Error calling Gemini:', error);
+      console.error('Error calling AI model:', error);
       return "Sorry, I'm having trouble responding right now.";
     }
   }

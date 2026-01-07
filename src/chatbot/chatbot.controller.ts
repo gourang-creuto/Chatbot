@@ -12,4 +12,10 @@ export class ChatbotController {
     const response = await this.chatbotService.getResponse(message);
     return { response };
   }
+
+  @Post('add-data')
+  async addData(@Body('text') text: string) {
+    await this.chatbotService.addPersonalData(text);
+    return { message: 'Data added successfully' };
+  }
 }
